@@ -1,7 +1,7 @@
-# Docs for the Azure Web Apps Deploy action: https://github.com/Azure/webapps-deploy
-# More GitHub Actions for Azure: https://github.com/Azure/actions
+# Unified Build and Deploy for React + .NET
+# Docs: https://github.com/Azure/webapps-deploy
 
-name: Build and deploy ASP.Net Core app to Azure Web App - ReactDotNet
+name: Build and deploy React .NET App
 
 on:
   push:
@@ -12,42 +12,60 @@ on:
 jobs:
   build:
     runs-on: windows-latest
-    permissions:
-      contents: read #This is required for actions/checkout
-
+    
     steps:
       - uses: actions/checkout@v4
 
+      # 1. Build React Frontend
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: './Frontend/package-lock.json'
+
+      - name: Install and Build Frontend
+        run: |
+          cd Frontend
+          npm install
+          npm run build
+
+      # 2. Copy React Build to .NET wwwroot
+      - name: Copy build to Backend wwwroot
+        run: |
+          mkdir Backend\wwwroot -Force
+          xcopy Frontend\dist\* Backend\wwwroot /E /H /C /I /Y
+
+      # 3. Build and Publish .NET Backend
       - name: Set up .NET Core
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '9.x'
 
-      - name: Build with dotnet
-        run: dotnet build --configuration Release
+      - name: Build and Publish Backend
+        run: |
+          cd Backend
+          dotnet publish -c Release -o "${{env.DOTNET_ROOT}}/myapp"
 
-      - name: dotnet publish
-        run: dotnet publish -c Release -o "${{env.DOTNET_ROOT}}/myapp"
-
-      - name: Upload artifact for deployment job
+      - name: Upload artifact for deployment
         uses: actions/upload-artifact@v4
         with:
-          name: .net-app
+          name: full-app
           path: ${{env.DOTNET_ROOT}}/myapp
 
   deploy:
     runs-on: windows-latest
     needs: build
     permissions:
-      id-token: write #This is required for requesting the JWT
-      contents: read #This is required for actions/checkout
+      id-token: write
+      contents: read
 
     steps:
-      - name: Download artifact from build job
+      - name: Download artifact
         uses: actions/download-artifact@v4
         with:
-          name: .net-app
-      
+          name: full-app
+
       - name: Login to Azure
         uses: azure/login@v2
         with:
@@ -56,10 +74,8 @@ jobs:
           subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_1407C3F0C3C84EF4BB39A28FB1DE8B19 }}
 
       - name: Deploy to Azure Web App
-        id: deploy-to-webapp
         uses: azure/webapps-deploy@v3
         with:
-          app-name: 'ReactDotNet'
+          app-name: 'ReactDotNet' # Update this if your Azure App name is different
           slot-name: 'Production'
           package: .
-          
