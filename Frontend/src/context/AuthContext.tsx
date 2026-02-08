@@ -1,5 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import api from '../services/api';
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 
 interface User {
   username: string;
@@ -20,7 +19,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const token = localStorage.getItem('token');
     const savedUser = localStorage.getItem('user');
-    
+
     if (token && savedUser) {
       setUser(JSON.parse(savedUser));
     }
